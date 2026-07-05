@@ -1,0 +1,53 @@
+name: Extract and Build APK
+
+on:
+  workflow_dispatch:
+
+jobs:
+  extract-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Find and extract zip
+        run: |
+          ZIP=$(find . -maxdepth 2 -name "*.zip" | head -1)
+          echo "Found: $ZIP"
+          unzip -o "$ZIP" -d extracted_temp
+          # Move contents up (handle nested folder)
+          INNER=$(ls extracted_temp/)
+          if [ $(ls extracted_temp/ | wc -l) -eq 1 ]; then
+            cp -r extracted_temp/$INNER/. .
+          else
+            cp -r extracted_temp/. .
+          fi
+          rm -rf extracted_temp "$ZIP"
+
+      - name: Commit extracted files
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add -A
+          git commit -m "Extract project files" || echo "Nothing to commit"
+          git push
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Build APK
+        run: flutter build apk --release
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: attendance-app-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
