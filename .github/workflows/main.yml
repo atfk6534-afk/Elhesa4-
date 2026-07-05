@@ -2,34 +2,33 @@ name: Extract and Build APK
 
 on:
   workflow_dispatch:
+  push:
+    branches: [ main, master ]
 
 jobs:
-  extract-and-build:
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Find and extract zip
+      - name: Extract zip if present
         run: |
           ZIP=$(find . -maxdepth 2 -name "*.zip" | head -1)
-          echo "Found: $ZIP"
-          unzip -o "$ZIP" -d extracted_temp
-          # Move contents up (handle nested folder)
-          INNER=$(ls extracted_temp/)
-          if [ $(ls extracted_temp/ | wc -l) -eq 1 ]; then
-            cp -r extracted_temp/$INNER/. .
+          if [ -n "$ZIP" ]; then
+            echo "Found zip: $ZIP"
+            unzip -o "$ZIP" -d _tmp
+            INNER=$(ls _tmp/)
+            COUNT=$(ls _tmp/ | wc -l)
+            if [ "$COUNT" -eq 1 ]; then
+              cp -r _tmp/$INNER/. .
+            else
+              cp -r _tmp/. .
+            fi
+            rm -rf _tmp "$ZIP"
+            echo "Extraction done"
           else
-            cp -r extracted_temp/. .
+            echo "No zip found, using repo files directly"
           fi
-          rm -rf extracted_temp "$ZIP"
-
-      - name: Commit extracted files
-        run: |
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
-          git add -A
-          git commit -m "Extract project files" || echo "Nothing to commit"
-          git push
 
       - uses: actions/setup-java@v4
         with:
